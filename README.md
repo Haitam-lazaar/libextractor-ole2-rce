@@ -134,6 +134,10 @@ With `-fstack-clash-protection`, the probes can still be bypassed in multi-threa
 
 Discovered by me (Haitam Lazaar) during my independent security research.
 
+## Acknowledgments
+
+Special thanks to **Christian Grothoff**, the maintainer of GNU `libextractor`, for his incredibly fast triage, professional communication, and rapid deployment of patches (v1.15, v1.16, and v1.17) to resolve this and several other memory safety issues reported during this audit.
+
 ## License
 
 My research is provided for educational and defensive purposes. Use responsibly.
