@@ -1,0 +1,106 @@
+From: Christian Grothoff
+Subject: [PATCH] ole2: bound read size to prevent stack overflow
+
+The process_star_office() function previously used a Variable Length Array
+(VLA) bounded only by 4MB. Since the function does not inspect data beyond
+0x374 bytes, the allocation and read are bounded to 0x374 to prevent
+stack-based buffer overflows.
+
+---
+ src/plugins/ole2_extractor.c | 52 +++++++++++++++++++++-----------------------
+ 1 file changed, 25 insertions(+), 27 deletions(-)
+
+diff --git a/src/plugins/ole2_extractor.c b/src/plugins/ole2_extractor.c
+index abc1234..def5678 100644
+--- a/src/plugins/ole2_extractor.c
++++ b/src/plugins/ole2_extractor.c
+@@ -341,50 +341,48 @@
+                      void *proc_cls)
+ {
+   off_t size = gsf_input_size (src);
++  char buf[0x374];
+ 
+-  if ( (size < 0x374) ||
+-       (size > 4 * 1024 * 1024) )
++  if (size < 0x374)
+     return 0;
+-  {
+-    char buf[size];
+-
+-    gsf_input_read (src, size, (unsigned char*) buf);
+-    if ( (buf[0] != 0x0F) ||
+-         (buf[1] != 0x0) ||
+-         (0 != strncmp (&buf[2],
+-                        "SfxDocumentInfo",
+-                        strlen ("SfxDocumentInfo"))) ||
+-         (buf[0x11] != 0x0B) ||
+-         (buf[0x13] != 0x00) || /* pw protected! */
+-         (buf[0x12] != 0x00) )
+-      return 0;
+-    buf[0xd3] = '\0';
+-    if ( (buf[0x94] + buf[0x93] > 0) &&
+-         (0 != add_metadata (proc, proc_cls,
+-                             &buf[0x95],
+-                             EXTRACTOR_METATYPE_TITLE)) )
+-      return 1;
+-    buf[0x114] = '\0';
+-    if ( (buf[0xd5] + buf[0xd4] > 0) &&
+-         (0 != add_metadata (proc, proc_cls,
+-                             &buf[0xd6],
+-                             EXTRACTOR_METATYPE_SUBJECT)) )
+-      return 1;
+-    buf[0x215] = '\0';
+-    if ( (buf[0x115] + buf[0x116] > 0) &&
+-         (0 != add_metadata (proc, proc_cls,
+-                             &buf[0x117],
+-                             EXTRACTOR_METATYPE_COMMENT)) )
+-      return 1;
+-    buf[0x296] = '\0';
+-    if ( (buf[0x216] + buf[0x217] > 0) &&
+-         (0 != add_metadata (proc, proc_cls,
+-                             &buf[0x218],
+-                             EXTRACTOR_METATYPE_KEYWORDS)) )
+-      return 1;
+-    /* fixme: do timestamps,
+-       mime-type, user-defined info's */
+-  }
++  gsf_input_read (src,
++                  sizeof (buf),
++                  (unsigned char*) buf);
++  if ( (buf[0] != 0x0F) ||
++       (buf[1] != 0x0) ||
++       (0 != strncmp (&buf[2],
++                      "SfxDocumentInfo",
++                      strlen ("SfxDocumentInfo"))) ||
++       (buf[0x11] != 0x0B) ||
++       (buf[0x13] != 0x00) ||   /* pw protected! */
++       (buf[0x12] != 0x00) )
++    return 0;
++  buf[0xd3] = '\0';
++  if ( (buf[0x94] + buf[0x93] > 0) &&
++       (0 != add_metadata (proc, proc_cls,
++                           &buf[0x95],
++                           EXTRACTOR_METATYPE_TITLE)) )
++    return 1;
++  buf[0x114] = '\0';
++  if ( (buf[0xd5] + buf[0xd4] > 0) &&
++       (0 != add_metadata (proc, proc_cls,
++                           &buf[0xd6],
++                           EXTRACTOR_METATYPE_SUBJECT)) )
++    return 1;
++  buf[0x215] = '\0';
++  if ( (buf[0x115] + buf[0x116] > 0) &&
++       (0 != add_metadata (proc, proc_cls,
++                           &buf[0x117],
++                           EXTRACTOR_METATYPE_COMMENT)) )
++    return 1;
++  buf[0x296] = '\0';
++  if ( (buf[0x216] + buf[0x217] > 0) &&
++       (0 != add_metadata (proc, proc_cls,
++                           &buf[0x218],
++                           EXTRACTOR_METATYPE_KEYWORDS)) )
++    return 1;
++  /* fixme: do timestamps,
++     mime-type, user-defined info's */
+   return 0;
+ }

